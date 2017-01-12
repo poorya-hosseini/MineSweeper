@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<!--
+To change this license header, choose License Headers in Project Properties.
+To change this template file, choose Tools | Templates
+and open the template in the editor.
+-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <style>
+            .board-table {
+                border-collapse: collapse;
+            }
+            .board-table td, board-table th {
+                border: 0px;
+                padding: 0px;
+            }
+            .board-table tr:first-child th {
+                border-top: 0;
+            }
+            .board-table tr:last-child td {
+                border-bottom: 0;
+            }
+            .board-table tr td:first-child,
+            .board-table tr th:first-child {
+                border-left: 0;
+            }
+            .board-table tr td:last-child,
+            .board-table tr th:last-child {
+                border-right: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <table class="game-wrap-table" style="border-collapse: collapse">
+            <tr style="border:5px; border-style: ridge">
+                <td style="background-color:#000000; border:5px; border-style: ridge">
+                    <canvas id="timerDisplay" width="50" height="30" style="background: #000000">
+                        Your browser is unfortunately not supported.
+                    </canvas>
+                </td>
+                <td style="border:0px; border-style: ridge">
+                    <div id="state" style="font-size: 35px; background-color: yellow" align="center"><button id="startButtonText" style="width:100%; height:100%" onclick="init()">&#9786</button></div>
+                </td>
+                <td style="background-color:#000000; border:5px; border-style: ridge">
+                    <div align="right">
+                        <canvas id="mineCounterDisplay" width="50" height="30" style="background: #000000">
+                            Your browser is unfortunately not supported.
+                        </canvas>
+                    </div>
+                </td>
+            </tr >
+            <tr style="border:5px; border-style: ridge"> 
+                <td  style="border:5px; border-style: ridge" colspan="3">
+                    <table class="board-table" id="table" style="padding:0px;margin:0px;border: 0px">
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <table>
+            <tr>
+                <td>Row</td>
+                <td><input type="number" id="rowNumber" value="10" style="margin:3px"></td>
+            </tr>
+            <tr>
+                <td>Column</td>
+                <td><input type="number" id="columnNumber" value="8" style="margin:3px"></td>
+            </tr>
+            <tr>
+                <td>Mine</td>
+                <td><input type="number" id="minesNumber" value="10" style="margin:3px"></td>
+            </tr>
+        </table>
+
+
+        <p id="error" style="color:red"></p>
+        <p id="test"></p>
+
+
+        <script type="text/javascript" src="segment-display.js"></script>
+        <script>
+            var stack = new Array();
+            var mineIndexes;
+            var matrix;
+            var minesNumber;
+            var time;
+            var timerDisplay;
+            var mineCounterDisplay;
+            var mineCounter;
+            init();
+
+            function init() {
+                document.getElementById('error').innerHTML = "";
+                var rowNumber = parseInt(document.getElementById('rowNumber').value);
+                var columnNumber = parseInt(document.getElementById('columnNumber').value);
+                minesNumber = parseInt(document.getElementById('minesNumber').value);
+
+                if (validateInput(rowNumber, columnNumber, minesNumber)) {
+                    document.getElementById('startButtonText').innerHTML = "&#9786";
+                    generate_table(rowNumber, columnNumber);
+                    matrix = new Create2DArray(rowNumber, columnNumber);
+                    mineIndexes = refreshMineIndexes();
+                    digMines(mineIndexes);
+                    time = 0;
+                    createTimer();
+                    mineCounter = minesNumber;
+                    createMineDisplay(mineCounter);
+                }
+
+
+                //                document.getElementById("test").innerHTML = "";
+                //                mineIndexes.forEach(function (element) {
+                //                    document.getElementById("test").innerHTML += "[" + element + "] ";
+                //                });
+                //
+                //                document.getElementById("test").innerHTML += "</br>";
+                //
+                //                matrix.forEach(function (row) {
+                //                    row.forEach(function (column) {
+                //                        if (column.isMine) {
+                //                            document.getElementById("test").innerHTML += "B\t";
+                //                        } else {
+                //                            document.getElementById("test").innerHTML += "_\t";
+                //                        }
+                //                    });
+                //                    document.getElementById("test").innerHTML += "</br>";
+                //                });
+            }
+
+            function createTimer() {
+                timerDisplay = new SegmentDisplay("timerDisplay");
+                timerDisplay.pattern = "###";
+                timerDisplay.displayAngle = 10;
+                timerDisplay.digitHeight = 10;
+                timerDisplay.digitWidth = 8;
+                timerDisplay.digitDistance = 1;
+                timerDisplay.segmentWidth = 1.5;
+                timerDisplay.segmentDistance = 0.3;
+                timerDisplay.segmentCount = 7;
+                timerDisplay.cornerType = 3;
+                timerDisplay.colorOn = "#FF5000";
+                timerDisplay.colorOff = "#640000";
+                timerDisplay.setValue("000");
+                timerDisplay.draw();
+                timeCounter = setInterval(timer, 1000);
+            }
+
+            function createMineDisplay(mineCounter) {
+                mineCounterDisplay = new SegmentDisplay("mineCounterDisplay");
+                mineCounterDisplay.pattern = "###";
+                mineCounterDisplay.displayAngle = 10;
+                mineCounterDisplay.digitHeight = 10;
+                mineCounterDisplay.digitWidth = 8;
+                mineCounterDisplay.digitDistance = 1;
+                mineCounterDisplay.segmentWidth = 1.5;
+                mineCounterDisplay.segmentDistance = 0.3;
+                mineCounterDisplay.segmentCount = 7;
+                mineCounterDisplay.cornerType = 3;
+                mineCounterDisplay.colorOn = "#FF5000";
+                mineCounterDisplay.colorOff = "#640000";
+                var value = "" + mineCounter;
+                mineCounterDisplay.setValue(value);
+                mineCounterDisplay.draw();
+            }
+
+            function validateInput(rowNumber, columnNumber, minesNumber) {
+                valid = true;
+                if (isNaN(rowNumber) || rowNumber <= 1) {
+                    document.getElementById('error').innerHTML += "* Row number is required and must be greater than 1. </br>"
+                    valid = false;
+                }
+                if (isNaN(columnNumber) || columnNumber <= 1) {
+                    document.getElementById('error').innerHTML += "* Column number is required and must be greater than 1. </br>";
+                    valid = false;
+                }
+                if (isNaN(minesNumber) || minesNumber < 1 || (minesNumber >= (rowNumber * columnNumber))) {
+                    document.getElementById('error').innerHTML += "* Number of mines is required and must be less than the number of the cells in the board. </br>";
+                    valid = false;
+                }
+                return valid;
+            }
+
+            function timer() {
+                time++;
+                if (time <= 999) {
+                    var val = "" + time;
+                    while (val.length < 3) {
+                        val = "0" + val;
+                    }
+                    timerDisplay.setValue(val);
+                    timerDisplay.draw();
+                } else {
+                    window.clearInterval(timeCounter);
+                }
+            }
+
+            function refreshMineIndexes() {
+                var mineIndexes = new Set();
+                while (mineIndexes.size < minesNumber) {
+                    temp = randomIndex();
+                    if (!setHas(mineIndexes, temp)) {
+                        mineIndexes.add(temp);
+                    }
+                }
+                return mineIndexes;
+            }
+
+            function digMines(mineIndexes) {
+                mineIndexes.forEach(function (element) {
+                    matrix[element[0]][element[1]].isMine = true;
+                });
+            }
+
+            function randomIndex() {
+                var i = Math.floor(Math.random() * matrix.length);
+                var j = Math.floor(Math.random() * matrix[0].length);
+                return [i, j];
+            }
+
+            function Hole(isMine, isChecked, isFlaged) {
+                this.isMine = isMine;
+                this.isChecked = isChecked;
+                this.isFlaged = isFlaged;
+            }
+
+            function setHas(set, value) {
+                var has = false;
+                set.forEach(function (element) {
+                    if ((element[0] === value[0]) && (element[1] === value[1])) {
+                        has = true;
+                    }
+                });
+                return has;
+            }
+
+            function Create2DArray(row, column) {
+                var arr = new Array(row);
+                for (var i = 0; i < row; i++) {
+                    arr[i] = new Array(column);
+                    for (var j = 0; j < column; j++) {
+                        arr[i][j] = new Hole(false, false, false);
+                    }
+                }
+                return arr;
+            }
+
+            function generate_table(rowNumber, columnNumber) {
+                var table = document.getElementById("table");
+                table.innerHTML = null;
+                var tblBody = document.createElement("tbody");
+                for (var i = 0; i < rowNumber; i++) {
+                    var row = document.createElement("tr");
+                    row.style.border = "0px";
+                    for (var j = 0; j < columnNumber; j++) {
+                        var cell = document.createElement("td");
+                        var btn = document.createElement("BUTTON");
+                        btn.style.padding = "14px 14px";
+                        btn.id = i.toString() + "-" + j.toString();
+                        btn.onclick = testMine;
+                        btn.oncontextmenu = flagUnflagHole;
+                        cell.appendChild(btn);
+                        row.appendChild(cell);
+                    }
+                    tblBody.appendChild(row);
+                }
+                table.appendChild(tblBody);
+            }
+
+            function testMine(e) {
+                var id = e.currentTarget.id.split("-");
+                var row = parseInt(id[0]);
+                var column = parseInt(id[1]);
+                if (matrix[row][column].isMine) {
+                    var btn = e.currentTarget;
+                    btn.disabled = true;
+                    btn.style.backgroundColor = "red";
+                    btn.innerHTML = "&#128163";
+                    btn.style.fontSize = "18px";
+                    btn.style.padding = "1px 1px";
+                    disableBoard();
+                    document.getElementById("startButtonText").innerHTML = "&#9785";
+                    document.getElementById("startButtonText").style.fontSize = "25px";
+                    window.clearInterval(timeCounter);
+                } else {
+                    reveal(id);
+                    if (checkWin()) {
+                        disableBoard();
+                        document.getElementById("error").innerHTML = "You Win!";
+                        window.clearInterval(timeCounter);
+                    }
+                }
+            }
+
+            function reveal(id) {
+                var row = parseInt(id[0]);
+                var column = parseInt(id[1]);
+                matrix[row][column].isChecked = true;
+                var btn = document.getElementById("" + row + "-" + column);
+                var weight = examineAround(id);
+                if (weight > 0) {
+                    stack.shift();
+                    btn.disabled = true;
+                    btn.style.backgroundColor = "#b7b7b7";
+                    btn.style.color = colorPick(weight);
+                    btn.innerHTML = weight;
+                    btn.style.height = "32px";
+                    btn.style.width = "32px";
+                    btn.style.fontSize = "18px";
+                    btn.style.padding = "2px 2px";
+                } else {
+                    btn.style.backgroundColor = "#b7b7b7";
+                    btn.disabled = true;
+                    propagateReveal(id);
+                }
+            }
+
+            function propagateReveal(id) {
+                var row = parseInt(id[0]);
+                var column = parseInt(id[1]);
+                for (var i = -1; i <= 1; i++) {
+                    var newRow = row + i;
+                    for (var j = -1; j <= 1; j++) {
+                        if (i === 0 && j === 0) {
+                            continue;
+                        }
+                        var newColumn = column + j;
+                        var btn = document.getElementById("" + newRow + "-" + newColumn);
+                        if (btn !== null) {
+                            if (!matrix[newRow][newColumn].isChecked) {
+                                btn.click();
+                            }
+                        }
+                    }
+                }
+            }
+
+            function checkWin() {
+                var checkedCounter = 0
+                for (var i = 0; i < matrix.length; i++) {
+                    for (var j = 0; j < matrix[0].length; j++) {
+                        if (matrix[i][j].isChecked) {
+                            checkedCounter++;
+                        }
+                    }
+                }
+                if (checkedCounter + minesNumber === matrix.length * matrix[0].length) {
+                    return true;
+                }
+                return false;
+            }
+
+            function colorPick(weight) {
+                switch (weight) {
+                    case 1:
+                        color = "blue";
+                        break;
+                    case 2:
+                        color = "green";
+                        break;
+                    case 3:
+                        color = "red";
+                        break;
+                    case 4:
+                        color = "DarkBlue";
+                        break;
+                    case 5:
+                        color = "brown";
+                        break;
+                    case 6:
+                        color = "Cyan";
+                        break;
+                    case 7:
+                        color = "Black";
+                        break;
+                    case 8:
+                        color = "Grey";
+                        break;
+                }
+                return color;
+            }
+
+            function myArrayHas(array, value) {
+                for (var i in array) {
+                    if ((array[i][0] === value[0]) && (array[i][1] === value[1])) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function examineAround(id) {
+                var counter = 0;
+                var row = parseInt(id[0]);
+                var column = parseInt(id[1]);
+                for (var i = -1; i <= 1; i++) {
+                    for (var j = -1; j <= 1; j++) {
+                        if (i === 0 && j === 0) {
+                            continue;
+                        }
+                        try {
+                            if (matrix[row + i][column + j].isMine) {
+                                counter++;
+                            }
+                        } catch (err) {
+                        }
+                    }
+                }
+                return counter;
+            }
+
+            function disableBoard() {
+                var allHoles = document.getElementById("table").getElementsByTagName("BUTTON");
+                for (var i = 0; i < allHoles.length; i++) {
+                    allHoles[i].disabled = true;
+                }
+            }
+
+            function flagUnflagHole(e) {
+                e.preventDefault();
+                var btn = e.currentTarget;
+                var id = e.currentTarget.id.split("-");
+                var row = id[0];
+                var column = id[1];
+                //btn.style.backgroundColor = "DeepSkyBlue";
+                if (matrix[row][column].isChecked) {
+                    return;
+                }
+                if (matrix[row][column].isFlaged) {
+                    btn.innerHTML = "";
+                    btn.style.padding = "14px 14px";
+                    matrix[row][column].isFlaged = false;
+                    mineCounter++;
+                    var value = "" + mineCounter;
+                    mineCounterDisplay.setValue(value);
+                    mineCounterDisplay.draw();
+                } else {
+                    btn.innerHTML = "&#9873";
+                    btn.style.fontSize = "21px";
+                    btn.style.padding = "0px 6px";
+                    matrix[row][column].isFlaged = true;
+                    mineCounter--;
+                    var value = "" + mineCounter;
+                    mineCounterDisplay.setValue(value);
+                    mineCounterDisplay.draw();
+                }
+            }
+
+        </script>
+    </body>
+</html>
